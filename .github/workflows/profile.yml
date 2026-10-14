@@ -1,0 +1,97 @@
+
+name: Update Profile Graphics
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "20 4 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create assets folder
+        run: mkdir -p assets
+
+      - name: Download profile graphics
+        shell: bash
+        run: |
+          download_svg() {
+            local url="$1"
+            local output="$2"
+            local temp="${output}.tmp"
+
+            echo "Generating $output"
+
+            if curl -fLsS --retry 3 \
+              --connect-timeout 15 \
+              --max-time 60 \
+              "$url" -o "$temp"; then
+
+              if grep -qi '<svg' "$temp" &&
+                 ! grep -qi 'Something went wrong' "$temp"; then
+                mv "$temp" "$output"
+                echo "Success: $output"
+              else
+                echo "Invalid SVG: $output"
+                rm -f "$temp"
+              fi
+            else
+              echo "Service unavailable: $output"
+              rm -f "$temp"
+            fi
+          }
+
+          # GitHub statistics
+          download_svg \
+            "https://github-readme-stats.vercel.app/api?username=vkn889&show_icons=true&hide_border=true&bg_color=0B1020&title_color=22D3EE&icon_color=22D3EE&text_color=E2E8F0" \
+            "assets/stats.svg"
+
+          # Most used languages
+          download_svg \
+            "https://github-readme-stats.vercel.app/api/top-langs/?username=vkn889&layout=compact&hide_border=true&bg_color=0B1020&title_color=22D3EE&text_color=E2E8F0" \
+            "assets/languages.svg"
+
+          # Contribution streak
+          download_svg \
+            "https://streak-stats.demolab.com?user=vkn889&hide_border=true&background=0B1020&ring=22D3EE&fire=38BDF8&currStreakLabel=22D3EE&sideLabels=E2E8F0&dates=94A3B8&sideNums=E2E8F0" \
+            "assets/streak.svg"
+
+          # Contribution activity graph
+          download_svg \
+            "https://github-readme-activity-graph.vercel.app/graph?username=vkn889&bg_color=0B1020&color=22D3EE&line=0891B2&point=FFFFFF&area=true&hide_border=true" \
+            "assets/activity.svg"
+
+          # GitHub trophies
+          download_svg \
+            "https://github-profile-trophy.vercel.app/?username=vkn889&theme=algolia&no-frame=true&no-bg=true&margin-w=8&column=4" \
+            "assets/trophies.svg"
+
+          # Featured repositories
+          for repo in Molt primer metier twig partyHunt; do
+            download_svg \
+              "https://github-readme-stats.vercel.app/api/pin/?username=vkn889&repo=${repo}&theme=tokyonight&hide_border=true&bg_color=0B1020&title_color=22D3EE&text_color=E2E8F0&icon_color=22D3EE" \
+              "assets/repo-${repo}.svg"
+          done
+
+      - name: Commit graphics
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add assets/
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update profile graphics"
+            git push
+          else
+            echo "No graphics changed"
+          fi
